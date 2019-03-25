@@ -1,0 +1,5 @@
+#!/bin/sh
+
+echo "Initializing 10G Port 0/1, Please wait..."
+bsl_diag64_mdio -i 1>/dev/null
+echo "Done"
