@@ -955,7 +955,7 @@ static PyObject* getVersion(PyObject *self, PyObject *args)
 {
 	int ret = 0;
 	int cardid = 0;
-	T_SystemVersion ver = {0,};
+	T_Version ver = {0,};
 
 	ret = PyArg_ParseTuple(args, "i", &cardid);
 	BSL_CHECK_TRUE(ret, (Py_BuildValue("(i)", ret)));
@@ -981,14 +981,15 @@ static PyObject* getVersion(PyObject *self, PyObject *args)
 
  * return tuple  --------------------------
   (i) link status of port 0
-  (i) link status of port 1
+  (i) link status of port 1, valid only if card->nports > 1
+  (i) link status of port 2, valid only if card->nports > 2
+  (i) link status of port 3, valid only if card->nports > 3
  -----------------------------------------*/
 static PyObject* getLinkStatus(PyObject *self, PyObject *args) 
 {
-    T_Card card={0,};
+    T_BslCard card={0,};
 	int ret = 0;
 	int cardid = 0;
-	int nport = 0;
 
 	ret = PyArg_ParseTuple(args, "i", &cardid);
 	BSL_CHECK_TRUE(ret, (Py_BuildValue("(i)", ret)));
@@ -999,17 +1000,11 @@ static PyObject* getLinkStatus(PyObject *self, PyObject *args)
     ret = bsl_getLinkStatus(cardid, &card);
 	BSL_CHECK_RESULT(ret, NULL);
 
-	//deliver to Python
-	//TODO: nport
-	nport = 2; //2 for 10G, 1 for 40G
-
-	if(nport == 2) {
-		return Py_BuildValue("(ii)", card.port[0].link.operState, card.port[1].link.operState);
-	}
-	else {
-		return Py_BuildValue("(i)", card.port[0].link.operState);
-	}
-	return NULL;
+	return Py_BuildValue("(iiii)", 
+			card.port[0].opstate,
+			card.port[1].opstate,
+			card.port[2].opstate,
+			card.port[3].opstate);
 }
 
 /* ---------------------------------------
