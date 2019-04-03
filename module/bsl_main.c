@@ -48,7 +48,7 @@ int __init bsl_init(void)
 	}
 //joon_e
 
-//	printk(KERN_INFO "BSL Module is now loaded. (Build : " __DATE__ __TIME__ ")\n");
+	printk(KERN_INFO "BSL Module is now loaded. (Build : %s %s)\n", __DATE__, __TIME__);
 	return 0;
 
 err:

@@ -7,6 +7,7 @@
 
 static struct pci_device_id pci_tbl[] = {
 	{ PCI_DEVICE(VENDOR_ID, DEVICE_ID), },
+	{ PCI_DEVICE(VENDOR_ID, DEVICE_ID_40G), },
 	{ 0, },
 };
 MODULE_DEVICE_TABLE(pci, pci_tbl);

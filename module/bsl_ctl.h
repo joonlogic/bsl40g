@@ -8,7 +8,7 @@
 #define BSL_DEV_MAJOR	245
 #define BSL_DEV_MAX     4
 #define SIZE_SUPPORT_DMA	    (1<<30)   //1GB
-#define SIZE_SUPPORT_DMA_40G	(1<<32)   //4GB
+#define SIZE_SUPPORT_DMA_40G	(1ll<<32)   //4GB
 
 // Information about contiguous buffer
 typedef struct {

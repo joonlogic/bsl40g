@@ -2,6 +2,7 @@
 #turn on/off debug message
 DEBUG = y
 
+CONFIG_MODULE_SIG=n
 KERNELDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 

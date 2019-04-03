@@ -5,6 +5,7 @@
 //#define DEVICE_ID	0x1101
 #define VENDOR_ID	0x10EE
 #define DEVICE_ID	0x6028
+#define DEVICE_ID_40G	0x8038
 
 #define BSL_PCI_DRIVER_NAME	"bsl_pci"
 
