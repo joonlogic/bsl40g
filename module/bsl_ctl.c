@@ -307,6 +307,7 @@ static int bsl_release_cma( bsl_pci_t* bsl_pci )
 	spinlock_t* cma_lock = &bsl_pci->lock_cma;
 	struct list_head* cma_allocations = &bsl_pci->cma_allocations;
 
+	void* prealloc = NULL;
     spin_lock(cma_lock);
     list_for_each(ptr, cma_allocations ) { 
         alloc = list_entry(ptr, struct cma_allocation, list);
@@ -319,35 +320,17 @@ static int bsl_release_cma( bsl_pci_t* bsl_pci )
 
 		_dev_info(cma_dev, "[count %d] free: CM virt: %p dma: %p size:%zuM\n",
 			i++, alloc->virt, (void *)alloc->dma, alloc->size / SZ_1M);
-		kfree(alloc);
+  
+		//Some system has stuck at kfree 
+		if(prealloc)
+			kfree((void*)prealloc);
+		prealloc = (void*)alloc;
+  
 	}
+	kfree(prealloc);
     spin_unlock(cma_lock);
 
 	return 0;
-
-	/*
-    spin_lock(&cma_lock);
-    if (!list_empty(&cma_allocations)) {
-        alloc = list_first_entry(&cma_allocations,
-            struct cma_allocation, list);
-
-    }
-    spin_unlock(&cma_lock);
-
-    if (!alloc)
-        return -EIDRM;
-
-	// Release the buffer
-	dmam_free_coherent( 
-			&(bsl_pci->pdev->dev),
-			alloc->size,
-			alloc->virt,
-			alloc->dma );
-
-    _dev_info(cma_dev, "free: CM virt: %p dma: %p size:%zuM\n",
-        alloc->virt, (void *)alloc->dma, alloc->size / SZ_1M);
-    kfree(alloc);
-	*/
 }
 
 static unsigned long long bsl_dma_buffer_alloc(bsl_pci_t *bsl_pci, ioc_io_buffer_t *pio_buffer)
@@ -676,7 +659,7 @@ int bsl_ctl_init(struct cdev *bsl_cdevp, int count)
 		verr = BSL_READ_REG(bsl_pcip, VERR);
 		spin_unlock(&(bsl_pcip->lock_hwaccess));
 
-		gbsl.card[i].nports = GET_NPORTS(verr);
+		gbsl.card[i].nports = GET_NPORTS(verr) > MAX_NPORTS ? MAX_NPORTS : GET_NPORTS(verr);
 		gbsl.card[i].type = CardTypeUnknown; //TODO:
 
 		for(j=0; j<gbsl.card[i].nports; j++) {
