@@ -948,7 +948,8 @@ static PyObject* getNumberOfCards(PyObject *self, PyObject *args)
   (i) card id
 
  * return tuple  --------------------------
-  (I) //TODO: later
+  (s) FPGA version
+  (s) API version
  -----------------------------------------*/
 
 static PyObject* getVersion(PyObject *self, PyObject *args) 

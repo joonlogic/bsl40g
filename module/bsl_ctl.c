@@ -625,7 +625,6 @@ static struct file_operations bsl_fops = {
 int bsl_ctl_init(struct cdev *bsl_cdevp, int count)
 {
 	int ret;
-	dev_t devno = MKDEV(BSL_DEV_MAJOR, 0);
 	int ncma = 2;
 	unsigned long sizedma;
 	int i=0;
@@ -634,7 +633,7 @@ int bsl_ctl_init(struct cdev *bsl_cdevp, int count)
 	uint64_t verr = 0ull;
 
 	DEBUG_FUNC("bsl_ctl_init\n");
-	ret = register_chrdev_region(devno, count, BSL_DEV_NAME);
+	ret = alloc_chrdev_region(&bsl_devp->devno, 0, count, BSL_DEV_NAME);
 	if (ret < 0) {
 		printk(KERN_WARNING "Can't get major\n");
 		return -1;
@@ -643,7 +642,7 @@ int bsl_ctl_init(struct cdev *bsl_cdevp, int count)
 	cdev_init(bsl_cdevp, &bsl_fops);
 	bsl_cdevp->owner = THIS_MODULE;
 	bsl_cdevp->ops = &bsl_fops;
-	ret = cdev_add(bsl_cdevp, devno, count);
+	ret = cdev_add(bsl_cdevp, bsl_devp->devno, count);
 	if (ret) {
 		printk(KERN_WARNING "Bad cdev\n");
 		return -1;
@@ -699,5 +698,5 @@ void bsl_ctl_cleanup(struct cdev *bsl_cdevp, int count)
 	}
 
 	cdev_del(bsl_cdevp);
-	unregister_chrdev_region(MKDEV(BSL_DEV_MAJOR, 0), count);
+	unregister_chrdev_region(bsl_devp->devno, count);
 }

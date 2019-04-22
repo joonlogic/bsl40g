@@ -64,6 +64,7 @@ typedef struct {
 	int ndev;
 	char version[24];
 	struct cdev bsl_cdev;
+	dev_t devno;
 	bsl_stat_t bsl_stat;
 	bsl_pci_t bsl_pci[MAX_CARDS_SUPPORTED];
 } bsl_dev_t;

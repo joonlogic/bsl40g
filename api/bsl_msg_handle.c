@@ -120,7 +120,7 @@ void bsl_swap32( void* ptr, int length );
 
 
 //*****************************************************************************/
-/* Message Id 100 : Get Chassis Information                                  */
+/* Message Id 100 : Get Version Information                                  */
 /*****************************************************************************/
 EnumResultCode 
 bsl_handle_msgid_100(
