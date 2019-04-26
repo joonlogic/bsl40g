@@ -1122,11 +1122,13 @@ static void get_firstmac(
 		return;
 	}
 
-	//reuse get_lastip6
+	//reuse get_lastmac
 	T_EtherAddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
 
-	stuple.repeatCount = portid % (tuple->repeatCount % MAX_NPORTS);
+	stuple.repeatCount = tuple->repeatCount < MAX_NPORTS ?
+		portid % tuple->repeatCount :
+		portid % MAX_NPORTS;
 
 	bool isdecre = 
 		((tuple->mode == EtherAddrModeDecrement) ||
@@ -1186,7 +1188,9 @@ static void get_firstCustomInteger(
 
 	int step = isdecre ? -tuple->step : tuple->step;
 
-	tuple->value += step * ((portid % tuple->repeat) % MAX_NPORTS); 
+	tuple->value += 
+		step * 
+		(portid % (tuple->repeat < NAX_NPORTS ? tuple->repeat : NAX_NPORTS));
 }
 
 static void makeupTupleCustomInteger(
@@ -1238,8 +1242,9 @@ static void get_firstip4(
 	T_Ip4AddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
 
-	stuple.repeat = portid % (tuple->repeat % MAX_NPORTS);
-
+	stuple.repeat = tuple->repeat < MAX_NPORTS ?
+		portid % tuple->repeat :
+		portid % MAX_NPORTS;
 
 	bool ishost = 
 		((tuple->mode == IpAddrModeIncrementHost) ||
@@ -1298,7 +1303,9 @@ static void get_firstip6(
 	T_Ip6AddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
 
-	stuple.repeat = portid % (tuple->repeat % MAX_NPORTS);
+	stuple.repeat = tuple->repeat < MAX_NPORTS ?
+		portid % tuple->repeat :
+		portid % MAX_NPORTS;
 
 	bool ishost = 
 		((tuple->mode == IpAddrModeIncrementHost) ||
