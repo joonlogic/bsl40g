@@ -9,14 +9,16 @@
 #ifndef BSL_EXT_H
 #define BSL_EXT_H
 
+#include <stdbool.h>
 #include "bsl_type.h"
 #include "bsl_proto.h"
 
 extern EnumResultCode
 bsl_getNumberOfCards(
 		int* nCards),
-bsl_getChassis( 
-		T_Chassis* chassis),
+bsl_getCardConfig(
+		T_BslSystem* bsl, 
+		bool verbose),
 bsl_getVersionInfo(
 		int cardid, 
 		T_Version* ver),

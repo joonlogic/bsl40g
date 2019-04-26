@@ -126,7 +126,7 @@ bsl_getCardConfig(T_BslSystem* bsl, bool verbose)
 
 	if(verbose) {
 		char* sbsl = tostring_bslsystem(bsl);
-		BSL_INFO(("%s> %s\n", __func__, sbsl));
+		BSL_INFO(("%s\n", sbsl));
 		if(sbsl) free(sbsl);
 	}
 
@@ -188,9 +188,11 @@ bsl_getVersionInfo( int cardid, T_Version* ver )
 	return ResultSuccess;
 }
 
+//deprecated...
 EnumResultCode 
 bsl_getChassis( T_Chassis* chassis )
 {
+#if 0
 	int fd = 0;
 	int ret = 0;
 	int linkstatus = 0;
@@ -236,6 +238,7 @@ bsl_getChassis( T_Chassis* chassis )
 					linkstatus & (1<<(ID_PORT_1)) ? "LinkUp" : "LinkDown" ));
 
 	}
+#endif
 	return ResultSuccess;
 }
 
