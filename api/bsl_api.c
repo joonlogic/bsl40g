@@ -1190,7 +1190,7 @@ static void get_firstCustomInteger(
 
 	tuple->value += 
 		step * 
-		(portid % (tuple->repeat < NAX_NPORTS ? tuple->repeat : NAX_NPORTS));
+		(portid % (tuple->repeat < MAX_NPORTS ? tuple->repeat : MAX_NPORTS));
 }
 
 static void makeupTupleCustomInteger(
