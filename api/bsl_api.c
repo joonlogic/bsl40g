@@ -1129,6 +1129,8 @@ static void get_firstmac(
 	T_EtherAddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
 
+	if(tuple->repeatCount == 0) tuple->repeatCount = 1;
+
 	stuple.repeatCount = tuple->repeatCount < MAX_NPORTS ?
 		portid % tuple->repeatCount :
 		portid % MAX_NPORTS;
@@ -1191,6 +1193,8 @@ static void get_firstCustomInteger(
 
 	int step = isdecre ? -tuple->step : tuple->step;
 
+	tuple->repeat = tuple->repeat == 0 ? 1 : tuple->repeat;
+
 	tuple->value += 
 		step * 
 		(portid % (tuple->repeat < MAX_NPORTS ? tuple->repeat : MAX_NPORTS));
@@ -1245,6 +1249,7 @@ static void get_firstip4(
 	T_Ip4AddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
 
+	tuple->repeat = tuple->repeat == 0 ? 1 : tuple->repeat;
 	stuple.repeat = tuple->repeat < MAX_NPORTS ?
 		portid % tuple->repeat :
 		portid % MAX_NPORTS;
@@ -1306,6 +1311,7 @@ static void get_firstip6(
 	T_Ip6AddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
 
+	tuple->repeat = tuple->repeat == 0 ? 1 : tuple->repeat;
 	stuple.repeat = tuple->repeat < MAX_NPORTS ?
 		portid % tuple->repeat :
 		portid % MAX_NPORTS;
