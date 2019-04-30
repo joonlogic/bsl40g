@@ -165,8 +165,10 @@ bsl_device_setPortActive( int fd, int portid, EnumPortActive enable )
 	BSL_CHECK_RESULT( ret, ret );
 	bool link40G = (portid == 0) && is40G(map) ? true : false;
 
-	enable = enable ? 0 : 1;
+//	enable = enable ? 0 : 1;
 	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PECR, enable );
+
+	BSL_DEV(("%s: PECR %X link40G %d enable %d\n", __func__, PECR, link40G, enable));
 
 	BSL_DEV(("%s: OFFSET_REGISTER_PORT(portid)+PECR (%X) = %016X\n", __func__, OFFSET_REGISTER_PORT(portid)+PECR, enable ));
 
