@@ -487,12 +487,37 @@ bsl_setStreamDetail(
 	//for 40G
 	T_Protocol protoext[MAX_NPORTS];
 	T_Stream streamext[MAX_NPORTS];
+	static const int nlayers = 4; //layer 2, l2tag, 3, 4
+	unsigned char plpdr[nlayers][MAX_NPORTS][128];
+	//128 might be enough to contain each pdrs.
+	//plpdr is for copying values from original pdr in each layers.
 
 	if(link40G) {
 		for(int i=0; i<MAX_NPORTS; i++) {
 			memcpy(&protoext[i], proto, sizeof(T_Protocol));
 			memcpy(&streamext[i], stream, sizeof(T_Stream));
 
+			if(i==0) continue;
+
+			if(proto->l2.pdr) { 
+				protoext[i].l2.pdr = (void*)plpdr[0][i];
+				memcpy(protoext[i].l2.pdr, proto->l2.pdr, proto->l2.length);
+			}
+			if(proto->l2tag.pdr) { 
+				protoext[i].l2tag.pdr = (void*)plpdr[1][i];
+				memcpy(protoext[i].l2tag.pdr, proto->l2tag.pdr, proto->l2tag.length);
+			}
+			if(proto->l3.pdr) { 
+				protoext[i].l3.pdr = (void*)plpdr[2][i];
+				memcpy(protoext[i].l3.pdr, proto->l3.pdr, proto->l3.length);
+			}
+			if(proto->l4.pdr) { 
+				protoext[i].l4.pdr = (void*)plpdr[3][i];
+				memcpy(protoext[i].l4.pdr, proto->l4.pdr, proto->l4.length);
+			}
+		}
+
+		for(int i=0; i<MAX_NPORTS; i++) {
 			bsl_makeupPdr(i, &protoext[i]);
 			bsl_makeupFrame(i, &protoext[i].fi);
 			bsl_makeHeader(&protoext[i]);
@@ -1134,6 +1159,7 @@ static void get_firstmac(
 	stuple.repeatCount = tuple->repeatCount < MAX_NPORTS ?
 		portid % tuple->repeatCount :
 		portid % MAX_NPORTS;
+	stuple.repeatCount++;
 
 	bool isdecre = 
 		((tuple->mode == EtherAddrModeDecrement) ||
@@ -1158,7 +1184,7 @@ static void makeupTupleEtherAddr(int portid, T_EtherAddrTuple* tuple)
 		return; 
 
 	//1. addr
-	get_firstmac(portid, tuple);
+	if(portid) get_firstmac(portid, tuple);
 
 	if(tuple->mode == EtherAddrModeRandom) return;
 
@@ -1245,6 +1271,8 @@ static void get_firstip4(
 		return;
 	}
 
+	if(portid == 0) return;
+
 	//reuse get_lastip4
 	T_Ip4AddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
@@ -1253,6 +1281,7 @@ static void get_firstip4(
 	stuple.repeat = tuple->repeat < MAX_NPORTS ?
 		portid % tuple->repeat :
 		portid % MAX_NPORTS;
+	stuple.repeat++;
 
 	bool ishost = 
 		((tuple->mode == IpAddrModeIncrementHost) ||
@@ -1307,6 +1336,8 @@ static void get_firstip6(
 {
 	//Don't support IpAddrModeRandom
 
+	if(portid == 0) return;
+
 	//reuse get_lastip6
 	T_Ip6AddrTuple stuple;
 	memcpy(&stuple, tuple, sizeof(stuple));
@@ -1315,6 +1346,7 @@ static void get_firstip6(
 	stuple.repeat = tuple->repeat < MAX_NPORTS ?
 		portid % tuple->repeat :
 		portid % MAX_NPORTS;
+	stuple.repeat++;
 
 	bool ishost = 
 		((tuple->mode == IpAddrModeIncrementHost) ||
