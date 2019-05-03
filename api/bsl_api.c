@@ -1156,10 +1156,17 @@ static void get_firstmac(
 
 	if(tuple->repeatCount == 0) tuple->repeatCount = 1;
 
-	stuple.repeatCount = tuple->repeatCount < MAX_NPORTS ?
-		portid % tuple->repeatCount :
-		portid % MAX_NPORTS;
-	stuple.repeatCount++;
+	bool iscontinue = 
+		((tuple->mode == EtherAddrModeContIncrement) ||
+		(tuple->mode == EtherAddrModeContDecrement)) ? true : false;
+
+	if(iscontinue) stuple.repeatCount = portid + 1;
+	else {
+		stuple.repeatCount = tuple->repeatCount < MAX_NPORTS ?
+			portid % tuple->repeatCount :
+			portid % MAX_NPORTS;
+		stuple.repeatCount++;
+	}
 
 	bool isdecre = 
 		((tuple->mode == EtherAddrModeDecrement) ||
@@ -1191,6 +1198,9 @@ static void makeupTupleEtherAddr(int portid, T_EtherAddrTuple* tuple)
 	//2. step
 	tuple->step *= MAX_NPORTS;
 
+	if((tuple->mode == EtherAddrModeContIncrement) || (tuple->mode == EtherAddrModeContDecrement))
+		return;
+
 	//3. count
 	tuple->mode = tuple->repeatCount > MAX_NPORTS ? tuple->mode : 
 		tuple->repeatCount == 3 ? tuple->mode :
@@ -1217,13 +1227,22 @@ static void get_firstCustomInteger(
 		(tuple->mode == CustomIntegerModeDecrement) ||
 		(tuple->mode == CustomIntegerModeContDecrement) ? true : false; 
 
+	bool iscontinue = 
+		(tuple->mode == CustomIntegerModeContIncrement) ||
+		(tuple->mode == CustomIntegerModeContDecrement) ? true : false; 
+
 	int step = isdecre ? -tuple->step : tuple->step;
 
 	tuple->repeat = tuple->repeat == 0 ? 1 : tuple->repeat;
 
-	tuple->value += 
-		step * 
-		(portid % (tuple->repeat < MAX_NPORTS ? tuple->repeat : MAX_NPORTS));
+	if(iscontinue) {
+		tuple->value += step * portid;
+	}
+	else { 
+		tuple->value += 
+			step * 
+			(portid % (tuple->repeat < MAX_NPORTS ? tuple->repeat : MAX_NPORTS));
+	}
 }
 
 static void makeupTupleCustomInteger(
@@ -1246,6 +1265,9 @@ static void makeupTupleCustomInteger(
 
 	//2. step
 	tuple->step *= MAX_NPORTS;
+
+	if((tuple->mode == CustomIntegerModeContIncrement) ||
+		(tuple->mode == CustomIntegerModeContDecrement)) return;
 
 	//3. mode
 	tuple->mode = tuple->repeat > MAX_NPORTS ? tuple->mode : 
@@ -1282,6 +1304,14 @@ static void get_firstip4(
 		portid % tuple->repeat :
 		portid % MAX_NPORTS;
 	stuple.repeat++;
+
+	bool iscont = 
+		((tuple->mode == IpAddrModeContIncrementHost) ||
+		(tuple->mode == IpAddrModeContDecrementHost) ||
+		(tuple->mode == IpAddrModeContIncrementNetwork) ||
+		(tuple->mode == IpAddrModeContDecrementNetwork)) ? true : false;
+
+	if(iscont) stuple.repeat = portid + 1;
 
 	bool ishost = 
 		((tuple->mode == IpAddrModeIncrementHost) ||
@@ -1325,6 +1355,11 @@ static void makeupTupleIp4Addr(
 
 	if(tuple->mode == IpAddrModeRandom) return;
 
+	if( (tuple->mode == IpAddrModeContIncrementHost) ||
+		(tuple->mode == IpAddrModeContDecrementHost) ||
+		(tuple->mode == IpAddrModeContIncrementNetwork) ||
+		(tuple->mode == IpAddrModeContDecrementNetwork)) return;
+
 	tuple->mode = tuple->repeat > MAX_NPORTS ? tuple->mode : 
 		tuple->repeat == 3 ? tuple->mode :
 		IpAddrModeFixed; // in case of 1,2,4
@@ -1347,6 +1382,14 @@ static void get_firstip6(
 		portid % tuple->repeat :
 		portid % MAX_NPORTS;
 	stuple.repeat++;
+
+	bool iscont = 
+		((tuple->mode == IpAddrModeContIncrementHost) ||
+		(tuple->mode == IpAddrModeContDecrementHost) ||
+		(tuple->mode == IpAddrModeContIncrementNetwork) ||
+		(tuple->mode == IpAddrModeContDecrementNetwork)) ? true : false;
+
+	if(iscont) stuple.repeat = portid + 1;
 
 	bool ishost = 
 		((tuple->mode == IpAddrModeIncrementHost) ||
@@ -1390,6 +1433,11 @@ static void makeupTupleIp6Addr(
 
 	//2. step
 	tuple->step *= MAX_NPORTS;
+
+	if((tuple->mode == IpAddrModeContIncrementHost) ||
+		(tuple->mode == IpAddrModeContDecrementHost) ||
+		(tuple->mode == IpAddrModeContIncrementNetwork) ||
+		(tuple->mode == IpAddrModeContDecrementNetwork)) return;
 
 	//3. mode
 	tuple->mode = tuple->repeat > MAX_NPORTS ? tuple->mode : 
