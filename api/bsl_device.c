@@ -1603,7 +1603,7 @@ bsl_device_setStreamDetail(
 				( pdr->src.mode == EtherAddrModeDecrement ) ) {
 				unsigned char lastaddr[SIZE_ETHER_ADDR] = {0,};
 				link40G ? 
-					get_lastmac40G(&pdr->dest, lastaddr, portid) :
+					get_lastmac40G(&pdr->src, lastaddr, portid) :
 					get_lastmac( &pdr->src, lastaddr );
 				smlr |= 
 					( (unsigned long long ) lastaddr[5] << 0 ) |
