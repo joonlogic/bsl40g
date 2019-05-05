@@ -61,9 +61,8 @@ unsigned short read_mdio_data(char* map, unsigned char phyaddr, unsigned char de
 #else
 unsigned short read_mdio_data(int fd, unsigned char phyaddr, unsigned char devaddr, unsigned short regaddr);
 #endif
-static unsigned short get_ip4_checksum( T_Protocol* proto, int* isoverride );
-static unsigned short get_l4_checksum( T_Protocol* proto, int* isoverride );
-static unsigned short calc_checksum( void* hp, int hlen );
+static unsigned short _get_ip4_checksum( T_Protocol* proto, int* isoverride );
+static unsigned short _get_l4_checksum( T_Protocol* proto, int* isoverride );
 void my_msleep(unsigned int msec);
 static void stop_dma( char* map, int cardid, int portid );
 static int start_dma( int fd, char* map, int cardid, int portid, unsigned int size, EnumCaptureMode ); 
@@ -89,6 +88,7 @@ getNports(char* map)
 	return GET_NPORTS(verr);
 }
 
+/* 
 static void
 write40GIntPorts(
 		char* map, 
@@ -109,6 +109,7 @@ write40GIntPorts(
 					OFFSET_REGISTER_PORT(ID_PORT(3)) + reg0, val));
 	}
 }
+*/
 
 //dommap and domunmap is used as direct accessing the registers on user mode.
 EnumResultCode 
@@ -364,7 +365,7 @@ bsl_device_getStats( int fd, T_LinkStats* stat )
 	return ResultSuccess;
 }
 
-char* capmap[SIZE_MAX_CARD][SIZE_MAX_PORT] = {NULL,};
+char* capmap[SIZE_MAX_CARD][SIZE_MAX_PORT] = {{NULL,},};
 
 EnumResultCode 
 bsl_device_setCapture( 
@@ -1000,7 +1001,7 @@ static unsigned int get_lastip6offset( T_Ip6AddrTuple* iptuple, unsigned char* l
 	return 0;
 }
 
-static int get_ip6hlen( T_Protocol* proto )
+int get_ip6hlen( T_Protocol* proto )
 {
 	T_PDR_Ip6* ip6pdr;
 	int hlen = 0;
@@ -1046,7 +1047,7 @@ static int get_ip6hlen( T_Protocol* proto )
 	return hlen; 
 }
 
-static int get_ip4hlen( T_Protocol* proto )
+int get_ip4hlen( T_Protocol* proto )
 {
 	T_PDR_Ip4* ip4pdr;
 	BSL_CHECK_NULL( proto, 0 );
@@ -1128,45 +1129,15 @@ static int get_distance_ip4chksum( T_Protocol* proto )
 #endif
 }
 
-static unsigned short get_ip4_checksum( T_Protocol* proto, int* isoverride )
+static unsigned short _get_ip4_checksum( T_Protocol* proto, int* isoverride )
 {
-	int distance = 0;
-	T_Ip4* hp = NULL;
-	void* shp = NULL;
-	int hlen = 0;
-	unsigned short chksum = 0;
 	T_PDR_Ip4* pdr = NULL;
 	BSL_CHECK_NULL( proto, 0 );
 
 	pdr = get_ip4_pdr( proto );
-	if( pdr->checksum.type == ChecksumOverride ) {
-		*isoverride = TRUE;
-		return pdr->checksum.value;
-	}
+	*isoverride = pdr->checksum.type == ChecksumOverride ? TRUE : FALSE;
 
-	*isoverride = FALSE;
-
-	//request by GUI 
-	return pdr->checksum.value;
-
-	//0. clear checksum field
-	distance = get_distance_ip4chksum( proto );
-	*(unsigned short*)(proto->header + distance ) = 0x0000;
-
-
-	//1. header length
-	shp = (void*)(proto->header + distance);
-	hp = (T_Ip4*)container_of( shp, T_Ip4, checksum );
-	BSL_CHECK_NULL( hp, 0 );
-	hlen = hp->hlen * 4;
-
-	//2. calc checksum
-	chksum = calc_checksum( (void*)hp, hlen );
-
-	if( pdr->checksum.type == ChecksumValid ) 
-		return chksum;
-	else
-		return chksum + 0x0101;
+	return htons(pdr->checksum.value);
 }
 
 static unsigned long long get_ip4_classSel( T_Ip4AddrTuple* tuple )
@@ -2103,14 +2074,14 @@ bsl_device_setStreamDetail(
 		if( ( proto->l3.protocol == ProtocolIP4 ) ||
 			( proto->l3.protocol == ProtocolIP4OverIP6 ) ||
 			( proto->l3.protocol == ProtocolIP6OverIP4 ) ) {
-			regi |= get_ip4_checksum( proto, &isoverride_ip4 );
+			regi |= _get_ip4_checksum( proto, &isoverride_ip4 );
 		}
 
 		if( ( proto->l4.protocol == ProtocolTCP ) ||
 			( proto->l4.protocol == ProtocolUDP ) ||
 			( proto->l4.protocol == ProtocolICMP ) ) {
 			regi |= 
-				(unsigned long long)(get_l4_checksum( proto, &isoverride_l4 ) & 
+				(unsigned long long)(_get_l4_checksum( proto, &isoverride_l4 ) & 
 				M_CSVR_L4_START_VALUE ) << I_CSVR_L4_START_VALUE;
 		}
 
@@ -2765,196 +2736,27 @@ unsigned int read32_mdio_data(unsigned char* map, unsigned char phyaddr, unsigne
     return (return_value);
 }
 
-static unsigned short calc_checksum( void* hp, int hlen )
-{
-	unsigned int sum = 0;
-	unsigned short* shp = (unsigned short*)hp;
-
-	while( hlen > 1 ) {
-		sum += (unsigned int)*shp++;
-		if( sum & 0x80000000 )
-			sum = ( sum & 0xFFFF ) + ( sum >> 16 );
-		hlen -= 2;
-	}
-
-	if( hlen )
-		sum += (unsigned int)*(unsigned char*)shp;
-
-	while(sum>>16)
-		sum = ( sum & 0xFFFF ) + ( sum >> 16 );
-
-	return (unsigned short)~sum;
-}
-
-static unsigned short get_l4_checksum( T_Protocol* proto, int* isoverride )
+static unsigned short _get_l4_checksum( T_Protocol* proto, int* isoverride )
 {	
-	int i=0;
-	struct pseudoip4
-	{
-		unsigned int   sip;
-		unsigned int   dip;
-		unsigned char  zero;
-		unsigned char  protocol;
-		unsigned short length;
-	}__attribute__((packed));
-
-	struct pseudoip6
-	{
-		unsigned char sip[16];
-		unsigned char dip[16];
-		unsigned int  length;
-		unsigned char zero[3];
-		unsigned char nexthdr;
-	}__attribute__((packed));
-
-	T_Ip4* ip4hp;
-	T_Ip6* ip6hp;
-
 	T_ChecksumTuple* cstuple = NULL;
 
-	unsigned short chksum = 0;
-	int isvalid = TRUE;
-	int icmp_hlen_offset = 0; //When ICMP type == 0, 8, 13, 14, 15, 16, 17, 18 then minus 4.
-
-	//0. get checksumtype
 	if( proto->l4.protocol == ProtocolTCP ) {
 		T_PDR_TCP* pdrtcp = (T_PDR_TCP*)proto->l4.pdr;
-		if( pdrtcp ) {
-			if( pdrtcp->checksum.type == ChecksumOverride ) {
-				*isoverride = TRUE;
-				return pdrtcp->checksum.value;
-			}
-			else if( pdrtcp->checksum.type == ChecksumInvalid ) 
-				isvalid = FALSE;
-
-			cstuple = &pdrtcp->checksum;
-		}
+		if( pdrtcp ) cstuple = &pdrtcp->checksum;
 	}
 	else if( proto->l4.protocol == ProtocolUDP ) {
 		T_PDR_UDP* pdrudp = (T_PDR_UDP*)proto->l4.pdr;
-		if( pdrudp ) {
-			if( pdrudp->checksum.type == ChecksumOverride ) {
-				*isoverride = TRUE;
-				return pdrudp->checksum.value;
-			}
-			else if( pdrudp->checksum.type == ChecksumInvalid ) 
-				isvalid = FALSE;
-
-			cstuple = &pdrudp->checksum;
-		}
+		if( pdrudp ) cstuple = &pdrudp->checksum;
 	}
 	else if( proto->l4.protocol == ProtocolICMP ) {
 		T_PDR_ICMP* pdricmp = (T_PDR_ICMP*)proto->l4.pdr;
-		if( pdricmp ) {
-			if( pdricmp->checksum.type == ChecksumOverride ) {
-				*isoverride = TRUE;
-				return pdricmp->checksum.value;
-			}
-			else if( pdricmp->checksum.type == ChecksumInvalid ) 
-				isvalid = FALSE;
-
-			cstuple = &pdricmp->checksum;
-
-			icmp_hlen_offset = 
-				((pdricmp->type == 0) || (pdricmp->type == 8) ||
-				 ((pdricmp->type >= 13) && (pdricmp->type <= 18))) ? 0 : 4;
-		}
-	}
-	
-	//request by GUI.
-	*isoverride = FALSE;
-	return cstuple ? cstuple->value : 0;
-
-	//0. make pseudohdr
-	int pseudo_offset = 
-		( proto->l3.protocol == ProtocolIP4 ) || ( proto->l3.protocol == ProtocolIP6 ) ?
-		proto->l3.offset :
-		( proto->l3.protocol == ProtocolIP6OverIP4 ) ? 
-		proto->l3.offset + get_ip4hlen( proto ) :
-		( proto->l3.protocol == ProtocolIP4OverIP6 ) ? 
-		proto->l3.offset + get_ip6hlen( proto ) : 0;
-
-	ip4hp = 
-		( proto->l3.protocol == ProtocolIP4 ) || 
-		( proto->l3.protocol == ProtocolIP4OverIP6 ) ?
-		(T_Ip4*)(proto->header + pseudo_offset ) : NULL;
-
-	ip6hp = 
-		( proto->l3.protocol == ProtocolIP6 ) || 
-		( proto->l3.protocol == ProtocolIP6OverIP4 ) ?
-		(T_Ip6*)(proto->header + pseudo_offset ) : NULL;
-
-	//1. get framesize
-	T_FrameSize* frame = (T_FrameSize*)&proto->fi;
-	int framelen = 
-		frame->fsizeSpec == FrameSizeFixed ?
-		frame->sizeOrStep :
-		frame->fsizeSpec == FrameSizeIncrement ?
-		frame->fsizeMin :
-		frame->fsizeSpec == FrameSizeRandom ?
-		frame->fsizeValueRand[0] : 0;
-
-	if( framelen )
-		framelen -= proto->l4.offset;
-
-	//2. fill payload pattern
-	int pseudolen = 0;
-	unsigned char data[SIZE_MAX_PAYLOAD] = {0,};
-	int validsize = proto->fi.pattern.validSize;
-	unsigned char* pload = (unsigned char*)proto->fi.pattern.payload;
-	unsigned char* payload = 
-		proto->l4.protocol == ProtocolTCP ?  data + pseudolen + sizeof(T_Tcp) :
-		proto->l4.protocol == ProtocolUDP ?  data + pseudolen + sizeof(T_Udp) :
-		proto->l4.protocol == ProtocolICMP ?  data + pseudolen + sizeof(T_Icmp) - icmp_hlen_offset:
-		data + pseudolen;
-
-	for( i=0; i<framelen; i+=validsize ) {
-		memcpy( payload+i, pload, validsize );
+		if( pdricmp ) cstuple = &pdricmp->checksum;
 	}
 
-	//3. fill psudoheader
-	struct pseudoip4 pip4 = {0,};
-	struct pseudoip6 pip6 = {0,};
+	BSL_CHECK_NULL(cstuple, 0);
 
-	if( ip4hp ) {
-		pip4.sip = ip4hp->sip;
-		pip4.dip = ip4hp->dip;
-		pip4.protocol = ip4hp->proto;
-		pip4.length = framelen;
-		pseudolen = sizeof(struct pseudoip4);
-		memcpy( data, &pip4, pseudolen );
-	}
-	else if( ip6hp ) {
-		memcpy( pip6.sip, ip6hp->sip, 16 );
-		memcpy( pip6.dip, ip6hp->dip, 16 );
-		pip6.length = framelen;
-		pip6.nexthdr = ip6hp->nextheader;
-		pseudolen = sizeof(struct pseudoip6);
-		memcpy( data, &pip6, pseudolen );
-	}
-
-	//4. copy l4
-	if( proto->l4.protocol == ProtocolTCP ) {
-		T_Tcp* ptcp = (T_Tcp*)( proto->header + proto->l4.offset );
-		memcpy( data+pseudolen, ptcp, sizeof(T_Tcp) );
-		ptcp = (T_Tcp*)(data+pseudolen);
-		ptcp->checksum = 0x0000;
-	}
-	else if( proto->l4.protocol == ProtocolUDP ) {
-		T_Udp* pudp = (T_Udp*)( proto->header + proto->l4.offset );
-		memcpy( data+pseudolen, pudp, sizeof(T_Udp) );
-		pudp = (T_Udp*)(data+pseudolen);
-		pudp->checksum = 0x0000;
-	}
-	else if( proto->l4.protocol == ProtocolICMP ) {
-		T_Icmp* picmp = (T_Icmp*)( proto->header + proto->l4.offset );
-		memcpy( data+pseudolen, picmp, sizeof(T_Icmp) - icmp_hlen_offset );
-		picmp = (T_Icmp*)(data+pseudolen);
-		picmp->checksum = 0x0000;
-	}
-
-	chksum = calc_checksum( (void*)payload, pseudolen + framelen );
-	return isvalid ? chksum : chksum + 0x0101;
+	*isoverride = cstuple->type == ChecksumOverride ? TRUE : FALSE;
+	return htons(cstuple->value);
 }
 
 // 2017.2.27 by dgjung

@@ -160,6 +160,8 @@ void bsl_msgif_listen_loop( int socketport )
 {
 	char* serverip = IP_LOCALHOST;
 	bsl_open_msg_listen_socket( serverip, socketport ); 
+
+	sleep(3);
 }
 
 void* bsl_msgif_listen( void* arg ) 

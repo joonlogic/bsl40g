@@ -95,7 +95,7 @@ static EntryFlag sEntryFlag[SIZE_MAX_CARD][SIZE_MAX_PORT] = {
 	    {TRUE, FALSE, FALSE, FALSE, FALSE},
 	    {TRUE, FALSE, FALSE, FALSE, FALSE},
 	    {TRUE, FALSE, FALSE, FALSE, FALSE} }};
-static EntryValue sEntryValue[SIZE_MAX_CARD][SIZE_MAX_PORT] = {0,};
+static EntryValue sEntryValue[SIZE_MAX_CARD][SIZE_MAX_PORT] = {{0,},};
 
 static u64 transFileFormat( 
 		int bslfd, 
@@ -169,7 +169,7 @@ static u64 transFileFormat( \
 {
 	int filecount = 0;
 	u64 packetcount = 0;
-	EntryOverhead overhead = {0,};
+	EntryOverhead overhead = {{0,},};
 	char ofilename[128] = {0,};
 	const char* prefix_file = "/var/www/html/BSL/bslcaps.";
 
@@ -298,7 +298,7 @@ static u64 getUnitLength( EntryOverhead* poverhead, int bslfd, int cardid, int p
 	u64 readbyte = 0;
 	u64 ioverhead[2] = {0,};
 	u64 unitlength = 0;
-    static u64 sreadbyte[SIZE_MAX_CARD][SIZE_MAX_PORT] = { 0, }; 
+    static u64 sreadbyte[SIZE_MAX_CARD][SIZE_MAX_PORT] = {{0,},}; 
 
 	if( isfirst ) sreadbyte[cardid][portid] = 0;
 
@@ -395,5 +395,58 @@ void bsl_swap64( void* ptr, int length )
         swapp++;
         length -= sizeof( unsigned long long );
     };
+}
+
+void hexdump(
+        const void *src,
+        size_t length,
+        size_t line_size,
+        char *prefix
+        )
+{
+    int i = 0;
+    const unsigned char *address = src;
+    const unsigned char *line = address;
+    unsigned char c;
+
+    printf("%s | ", prefix);
+    while (length-- > 0) {
+        printf("%02X ", *address++);
+        if (!(++i % line_size) || (length == 0 && i % line_size)) {
+            if (length == 0) {
+                while (i++ % line_size)
+                    printf("__ ");
+            }
+            printf(" | ");  /* right close */
+            while (line < address) {
+                c = *line++;
+                printf("%c", (c < 33 || c == 255) ? 0x2E : c);
+            }
+            printf("\n");
+            if (length > 0)
+                printf("%s | ", prefix);
+        }
+    }
+}
+
+unsigned short calc_checksum( void* hp, int hlen )
+{
+    unsigned int sum = 0;
+    unsigned short* shp = (unsigned short*)hp;
+
+    while( hlen > 1 ) {
+        sum += (unsigned int)*shp++;
+        if( sum & 0x80000000 )
+            sum = ( sum & 0xFFFF ) + ( sum >> 16 );
+        hlen -= 2;
+    }
+
+    if( hlen )
+        sum += (unsigned int)*(unsigned char*)shp;
+
+    while(sum>>16)
+        sum = ( sum & 0xFFFF ) + ( sum >> 16 );
+
+    return (unsigned short)~sum;
 }
 

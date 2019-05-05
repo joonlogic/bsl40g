@@ -1054,7 +1054,8 @@ void copy_msgid_110_req( T_MSGIF_110_REQ_UNIT* requnit, int tpdrlen, T_Protocol*
 	proto->fi.pattern.payloadOffset = (pload->poffset);
 	proto->fi.pattern.validSize = (pload->pvalidSize);
 
-	if( FrameDataTypeRepeating == proto->fi.payloadType ) {
+	if((FrameDataTypeRepeating == proto->fi.payloadType) ||
+		(FrameDataTypeFixed == proto->fi.payloadType)) {
 		int i,j;
 		for(i=0; 
 			i<proto->fi.pattern.validSize-(proto->fi.pattern.validSize%4); 

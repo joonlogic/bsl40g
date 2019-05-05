@@ -578,6 +578,229 @@ char* bsl_getErrorStr( EnumResultCode code )
 	else return "Unknown";
 }
 
+static void makeChksumIp4(T_PDR_Ip4* pdr, T_Ip4* hp)
+{
+    BSL_CHECK_NULL( pdr, );
+    BSL_CHECK_NULL( hp, );
+
+    if( pdr->checksum.type == ChecksumOverride ) {
+        return;
+    }
+
+	int hlen = hp->version * 4; //use version instead of hlen because it swapped.
+	hp->checksum = 0; 
+    hexdump(hp, hlen, 16, "IP4 CHKSUM DATA");
+    unsigned short chksum = calc_checksum( (void*)hp, hlen );
+
+	hp->checksum = 
+		pdr->checksum.type == ChecksumValid ? 
+		chksum :
+		chksum + 0x0101;
+	pdr->checksum.value = htons(hp->checksum);
+}
+
+static void makeChksumL4(T_Protocol* proto)
+{
+    int i=0;
+    struct pseudoip4
+    {
+        unsigned int   sip;
+        unsigned int   dip;
+        unsigned char  zero;
+        unsigned char  protocol;
+        unsigned short length;
+    }__attribute__((packed));
+
+    struct pseudoip6
+    {
+        unsigned char sip[16];
+        unsigned char dip[16];
+        unsigned int  length;
+        unsigned char zero[3];
+        unsigned char nexthdr;
+    }__attribute__((packed));
+
+    T_Ip4* ip4hp;
+    T_Ip6* ip6hp;
+
+    T_ChecksumTuple* cstuple = NULL;
+
+    unsigned short chksum = 0;
+    int icmp_hlen_offset = 0; //When ICMP type == 0, 8, 13, 14, 15, 16, 17, 18 then minus 4.
+
+    //0. get checksumtype
+    if( proto->l4.protocol == ProtocolTCP ) {
+        T_PDR_TCP* pdrtcp = (T_PDR_TCP*)proto->l4.pdr;
+        if( pdrtcp ) {
+            if( pdrtcp->checksum.type == ChecksumOverride ) {
+                return;
+            }
+            cstuple = &pdrtcp->checksum;
+        }
+    }
+    else if( proto->l4.protocol == ProtocolUDP ) {
+        T_PDR_UDP* pdrudp = (T_PDR_UDP*)proto->l4.pdr;
+        if( pdrudp ) {
+            if( pdrudp->checksum.type == ChecksumOverride ) {
+                return;
+            }
+            cstuple = &pdrudp->checksum;
+        }
+    }
+    else if( proto->l4.protocol == ProtocolICMP ) {
+        T_PDR_ICMP* pdricmp = (T_PDR_ICMP*)proto->l4.pdr;
+        if( pdricmp ) {
+            if( pdricmp->checksum.type == ChecksumOverride ) {
+                return;
+            }
+
+            cstuple = &pdricmp->checksum;
+
+            icmp_hlen_offset =
+                ((pdricmp->type == 0) || (pdricmp->type == 8) ||
+                 ((pdricmp->type >= 13) && (pdricmp->type <= 18))) ? 0 : 4;
+        }
+    }
+	bool isvalid = cstuple->type == ChecksumValid ? true : false;
+
+    //1. make pseudohdr
+    int pseudo_offset =
+        ( proto->l3.protocol == ProtocolIP4 ) || ( proto->l3.protocol == ProtocolIP6 ) ?
+        proto->l3.offset :
+        ( proto->l3.protocol == ProtocolIP6OverIP4 ) ?
+        proto->l3.offset + get_ip4hlen( proto ) :
+        ( proto->l3.protocol == ProtocolIP4OverIP6 ) ?
+        proto->l3.offset + get_ip6hlen( proto ) : 0;
+
+    ip4hp =
+        ( proto->l3.protocol == ProtocolIP4 ) ||
+        ( proto->l3.protocol == ProtocolIP4OverIP6 ) ?
+        (T_Ip4*)(proto->header + pseudo_offset ) : NULL;
+
+    ip6hp =
+        ( proto->l3.protocol == ProtocolIP6 ) ||
+        ( proto->l3.protocol == ProtocolIP6OverIP4 ) ?
+        (T_Ip6*)(proto->header + pseudo_offset ) : NULL;
+
+    //2. get framesize
+    T_FrameSize* frame = (T_FrameSize*)&proto->fi;
+    int framelen =
+        frame->fsizeSpec == FrameSizeFixed ?
+        frame->sizeOrStep :
+        frame->fsizeSpec == FrameSizeIncrement ?
+        frame->fsizeMin :
+        frame->fsizeSpec == FrameSizeRandom ?
+        frame->fsizeValueRand[0] : 0;
+
+    if( framelen )
+        framelen -= proto->l4.offset;
+
+    //3. fill psudoheader
+    int pseudolen = 0;
+    unsigned char data[SIZE_MAX_PAYLOAD] = {0,};
+    struct pseudoip4 pip4 = {0,};
+    struct pseudoip6 pip6 = {{0,},};
+
+    if( ip4hp ) {
+        pip4.sip = ip4hp->sip;
+        pip4.dip = ip4hp->dip;
+        pip4.protocol = ip4hp->proto;
+        pip4.length = htons(framelen);
+        pseudolen = sizeof(struct pseudoip4);
+        memcpy( data, &pip4, pseudolen );
+    }
+    else if( ip6hp ) {
+        memcpy( pip6.sip, ip6hp->sip, 16 );
+        memcpy( pip6.dip, ip6hp->dip, 16 );
+        pip6.length = framelen;
+        pip6.nexthdr = ip6hp->nextheader;
+        pseudolen = sizeof(struct pseudoip6);
+        memcpy( data, &pip6, pseudolen );
+    }
+
+    //4. copy l4
+	unsigned short* pchksum;
+    if( proto->l4.protocol == ProtocolTCP ) {
+        T_Tcp* ptcp = (T_Tcp*)( proto->header + proto->l4.offset );
+		pchksum = &ptcp->checksum;
+        memcpy( data+pseudolen, ptcp, sizeof(T_Tcp) );
+        ptcp = (T_Tcp*)(data+pseudolen);
+        ptcp->checksum = 0x0000;
+    }
+    else if( proto->l4.protocol == ProtocolUDP ) {
+        T_Udp* pudp = (T_Udp*)( proto->header + proto->l4.offset );
+		pchksum = &pudp->checksum;
+        memcpy( data+pseudolen, pudp, sizeof(T_Udp) );
+        pudp = (T_Udp*)(data+pseudolen);
+        pudp->checksum = 0x0000;
+    }
+    else if( proto->l4.protocol == ProtocolICMP ) {
+        pseudolen = 0; //no need pseudo header
+        T_Icmp* picmp = (T_Icmp*)( proto->header + proto->l4.offset );
+		pchksum = &picmp->checksum;
+        memcpy( data+pseudolen, picmp, sizeof(T_Icmp) - icmp_hlen_offset );
+        picmp = (T_Icmp*)(data+pseudolen);
+        picmp->checksum = 0x0000;
+    }
+
+    //4. fill payload pattern
+    int validsize = proto->fi.pattern.validSize;
+    unsigned char* pload = (unsigned char*)proto->fi.pattern.payload;
+    unsigned char* payload =
+        proto->l4.protocol == ProtocolTCP ?  data + pseudolen + sizeof(T_Tcp) :
+        proto->l4.protocol == ProtocolUDP ?  data + pseudolen + sizeof(T_Udp) :
+        proto->l4.protocol == ProtocolICMP ?  data + pseudolen + sizeof(T_Icmp) - icmp_hlen_offset :
+        data + pseudolen;
+    unsigned short* payloads = (unsigned short*)payload;
+
+    switch(proto->fi.payloadType) {
+        unsigned char fill;
+        unsigned short fills;
+        case FrameDataTypeIncByte :
+            fill = 0;
+            for(i=0; i<framelen; i++) {
+                *payload++ = fill++;
+            }
+            break;
+        case FrameDataTypeDecByte :
+            fill = 0xFF;
+            for(i=0; i<framelen; i++) {
+                *payload++ = fill--;
+            }
+            break;
+        case FrameDataTypeIncWord :
+            fills = 0;
+            for(i=0; i<framelen/sizeof(short); i++) {
+                *payloads++ = htons(fills++);
+            }
+            break;
+        case FrameDataTypeDecWord :
+            fills = 0xFFFF;
+            for(i=0; i<framelen/sizeof(short); i++) {
+                *payloads++ = htons(fills--);
+            }
+            break;
+        case FrameDataTypeRepeating :
+            for(i=0; i<framelen; i+=validsize) {
+                memcpy(payload+i, pload, validsize);
+            }
+            break;
+        case FrameDataTypeFixed :
+        case FrameDataTypeRandom :
+            memcpy(payload, pload, validsize);
+            break;
+
+        default :
+            break;
+    }
+
+    hexdump(data, framelen + pseudolen, 16, "*L4 CHKSUM DATA");
+    chksum = calc_checksum( (void*)data, pseudolen + framelen );
+	printf("=======> %04X\n", chksum);
+    *pchksum = isvalid ? chksum : chksum + 0x0101;
+	cstuple->value = htons(*pchksum);
+}
+
 EnumResultCode 
 bsl_makeHeader( T_Protocol* proto )
 {
@@ -600,15 +823,22 @@ bsl_makeHeader( T_Protocol* proto )
 	if( makeHeader_f_ptr[proto->l3.protocol] ) 
 		makeHeader_f_ptr[proto->l3.protocol]( proto );
 	
-	if( makeHeader_f_ptr[proto->l4.protocol] ) 
+	if( makeHeader_f_ptr[proto->l4.protocol] ) { 
 		makeHeader_f_ptr[proto->l4.protocol]( proto );
+		makeChksumL4(proto);
+	} 
 	
 	bsl_swap64( proto->header, proto->headerLength ); 
+
+	/*
+	BSL_INFO(("HEADER DUMP (headerlen %d)\n", proto->headerLength));
+    hexdump(proto->header, proto->headerLength, 16, "HEADER");
+	*/
 
 	do {
 		unsigned char* ptr = (unsigned char*)proto->header;
 		int i;
-		BSL_INFO(("HEADER DUMP (headerlen %d) ----------------------- \n", proto->headerLength));
+		BSL_INFO(("HEADER DUMP (headerlen %d) --------------- ", proto->headerLength));
 
 		for( i=0; i<proto->headerLength; i+=8 ) {
 			if( i%16 == 0 ) printf("\n[%04d] ", i );
@@ -785,8 +1015,9 @@ static void makeHeaderIp4FromPdr(
 	hp->checksum = ntohs( hp->checksum );
 	hp->sip = ntohl( hp->sip );
 	hp->dip = ntohl( hp->dip );
-}
 
+	makeChksumIp4(pdr, hp);
+}
 
 static void makeHeaderIp4( T_Protocol* proto )
 {

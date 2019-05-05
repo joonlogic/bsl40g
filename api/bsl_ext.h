@@ -160,13 +160,22 @@ extern unsigned int
 get_lastip4( 
 		T_Ip4AddrTuple* iptuple);
 
+extern int 
+get_ip6hlen( T_Protocol* proto ),
+get_ip4hlen( T_Protocol* proto );
+
 extern unsigned short
 getLastTcpUdpPort(
 		T_CustomIntegerTuple* tuple);
 
-extern void bsl_swap32(void* ptr, int length);
-extern void bsl_swap64(void* ptr, int length);
+extern unsigned short 
+calc_checksum( 
+		void* hp, int hlen );
 
-extern void bsl_msgif_listen_loop( int socketport );
+extern void 
+bsl_swap32(void* ptr, int length),
+bsl_swap64(void* ptr, int length),
+hexdump(const void *src, size_t length, size_t line_size, char *prefix), 
+bsl_msgif_listen_loop( int socketport );
 
 #endif //BSL_EXT_H
