@@ -746,6 +746,7 @@ static void get_lastmac40G(
 	memcpy(&stuple, tuple, sizeof(stuple));
 
 	stuple.repeatCount -= portid;
+	if(!stuple.repeatCount) stuple.repeatCount = 3; //This is an exception for repeat 3 && portid 3
 	stuple.step /= MAX_NPORTS;
 
 	get_lastmac(&stuple, lastaddr); 
@@ -804,6 +805,7 @@ static unsigned int get_lastip440G(
 	memcpy(&stuple, iptuple, sizeof(stuple));
 
 	stuple.repeat -= portid;
+	if(!stuple.repeat) stuple.repeat = 3; //This is an exception for repeat 3 && portid 3
 
 	return get_lastip4(&stuple);
 }
@@ -944,6 +946,7 @@ static void get_lastip640G(
 	memcpy(&stuple, iptuple, sizeof(stuple));
 
 	stuple.repeat -= portid;
+	if(!stuple.repeat) stuple.repeat = 3; //This is an exception for repeat 3 && portid 3
 	stuple.step /= MAX_NPORTS;
 
 	get_lastip6(&stuple, lastaddr);
@@ -2813,6 +2816,7 @@ getLastIp4ID40G(T_CustomIntegerTuple* tuple, int portid)
 
 	stuple.step /= MAX_NPORTS;
 	stuple.repeat -= portid;
+	if(!stuple.repeat) stuple.repeat = 3; //This is an exception for repeat 3 && portid 3
 
 	return getLastIp4ID(&stuple);
 }
@@ -2870,6 +2874,7 @@ getLastTcpUdpPort40G(T_CustomIntegerTuple* tuple, int portid)
 
 	stuple.step /= MAX_NPORTS;
 	stuple.repeat -= portid;
+	if(!stuple.repeat) stuple.repeat = 3; //This is an exception for repeat 3 && portid 3
 
 	return getLastTcpUdpPort(&stuple);
 }
