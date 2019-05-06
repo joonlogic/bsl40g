@@ -10,6 +10,7 @@ TARGET +=  bsl_diag64
 TARGET +=  bsl_diag64_mdio
 TARGET += bsl_link
 TARGET += bsl_chassis
+TARGET += bsl_stream
 
 ifeq ($(BSL_LIBDIR),)
 	BSL_LIBDIR = ../api
@@ -39,6 +40,9 @@ bsl_main_sim: bsl_main.c $(BSL_SIM_LIB)
 	$(CC) -Wall $< $(BSL_SIM_LIB) $(LFLAGS) $(BSL_INC) -o $@
 
 bsl_link: bsl_link.c $(BSL_LIB)
+	$(CC) -Wall $< $(BSL_LIB) $(LFLAGS) $(TARGET_CFLAGS) $(BSL_INC) -o $@
+
+bsl_stream: bsl_stream.c $(BSL_LIB)
 	$(CC) -Wall $< $(BSL_LIB) $(LFLAGS) $(TARGET_CFLAGS) $(BSL_INC) -o $@
 
 bsl_chassis: bsl_chassis.c $(BSL_LIB)
