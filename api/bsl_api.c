@@ -1819,6 +1819,7 @@ static void makeupPdrISL(int portid, T_Protocol* proto )
 EnumResultCode 
 bsl_makeupFrame(int portid, T_Frame* frame)
 {
+	//1. Frame Size
 	T_FrameSize* fsize = &frame->framesize;
 	if(fsize->fsizeSpec == FrameSizeFixed) ;
 	else if(fsize->fsizeSpec == FrameSizeRandom) {
@@ -1848,6 +1849,23 @@ bsl_makeupFrame(int portid, T_Frame* frame)
 		BSL_TRACE(("\t[%d] Min %d Step %d Max %d\n", \
 					portid, newmin, newstep, newmax));
 	}
+	
+	//2. Payload Pattern
+    if(frame->payloadType == FrameDataTypeRandom) {
+		//TODO: assign data according to payload size
+		int validsize = frame->pattern.validSize;
+		unsigned int* pload = (unsigned int*)frame->pattern.payload;
+
+		if(portid == 0) {
+			srand(*pload);
+		}
+		else {
+			for(int i=0; i<validsize; i+=sizeof(int)) {
+				*pload++ = rand();
+			}
+		}
+	}
+
 	return ResultSuccess;
 }
 	
