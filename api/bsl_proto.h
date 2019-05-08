@@ -23,8 +23,10 @@
 #pragma pack(1)
 
 #define SIZE_PREAMBLE                      8        
+#define SIZE_IFG_SHORT                     12        
 #define SIZE_ETHER_ADDR                    6        
 #define SIZE_ETHER_TYPE                    2        
+#define SIZE_ETHER_FCS                     4        
 #define SIZE_ISL_ADDR                      5        
 #define SIZE_ISL_SNAP                      3        
 #define SIZE_ISL_HSA                       3        
