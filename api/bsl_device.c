@@ -65,7 +65,7 @@ static unsigned short _get_ip4_checksum( T_Protocol* proto, int* isoverride );
 static unsigned short _get_l4_checksum( T_Protocol* proto, int* isoverride );
 void my_msleep(unsigned int msec);
 static void stop_dma( char* map, int cardid, int portid );
-static int start_dma( int fd, char* map, int cardid, int portid, unsigned int size, EnumCaptureMode ); 
+static int start_dma( int fd, char* map, int cardid, int portid, unsigned long long size, EnumCaptureMode ); 
 static void* dma_thread( void* arg );
 static T_PDR_Ip4* get_ip4_pdr( T_Protocol* proto );
 static unsigned short 
@@ -380,6 +380,7 @@ bsl_device_setCapture(
 		int start )
 {
 	int ret = 0;
+	unsigned long long size2 = 0ll;
 
 	BSL_DEV(("%s: Enter. cardid %d portid %d mode %d size %d start %d\n", \
 				__func__, cardid, portid, mode, size, start ));
@@ -387,12 +388,17 @@ bsl_device_setCapture(
 	ret = dommap( fd, &capmap[cardid][portid] );
 	BSL_CHECK_RESULT( ret, ret );
 
+	bool link40G = is40G(capmap[cardid][portid]);
+	if(link40G) size2 = 1ull << 32;
+	else size2 = size;
+
+	BSL_DEV(("%s: size2 %ld\n", __func__, size2)); 
 
 	if( start == 0 ) {
 		stop_dma( capmap[cardid][portid], cardid, portid );
 	}
 	else {
-		ret = start_dma( fd, capmap[cardid][portid], cardid, portid, size, mode );
+		ret = start_dma( fd, capmap[cardid][portid], cardid, portid, size2, mode );
 	}
 
 	if( start == 0 ) {
@@ -2889,14 +2895,14 @@ static void stop_dma( char* map, int cardid, int portid )
 #endif
 }
 
-static int start_dma( int fd, char* map, int cardid, int portid, unsigned int size, EnumCaptureMode mode ) 
+static int start_dma( int fd, char* map, int cardid, int portid, unsigned long long size, EnumCaptureMode mode ) 
 {
     int ret;
 
     /************************************
     *         For DMA Resources
     ************************************/
-	T_DMA_ARG* dma_arg;
+	T_DMA_ARG* dma_arg = NULL;
     ioc_io_buffer_t* pciBuffer;
     void* pciUserp = NULL;    
 	pthread_t thrid;
@@ -2915,7 +2921,7 @@ static int start_dma( int fd, char* map, int cardid, int portid, unsigned int si
         goto close_fd;
     }
 
-    printf("UAddr(%p) PAddr(%llx) VAddr(%llx) Size(%d)\n",
+    printf("UAddr(%p) PAddr(%llx) VAddr(%llx) Size(%ld)\n",
         pciUserp,
         pciBuffer->PhysicalAddr,
         pciBuffer->CpuPhysical,
@@ -2946,7 +2952,7 @@ close_fd:
 
     close(fd);
 	free(pciBuffer);
-	free(dma_arg);
+	if(dma_arg) free(dma_arg);
 
     return -1; 
 }
@@ -3026,6 +3032,8 @@ void bsl_process_dma( T_DMA_ARG* dma_arg )
    
     printf("WRITE - C%cAR %llx\n", cport, cxar );
     WRITE64( dma_arg->map, CXAR, cxar );
+	cxar = READ64( dma_arg->map, CXAR ); //sometimes 0 is read in development stage
+
 #ifdef DMA_PLDA
     unsigned long long cxsr = 0ll;
     int CXSR = dma_arg->portid ? C3SR : C0SR;

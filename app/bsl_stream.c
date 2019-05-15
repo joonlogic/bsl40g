@@ -72,8 +72,8 @@ int main(int argc, char *argv[])
 	stream.control.loopCount = 0;    
 	stream.control.pktsPerBurst = 0;    
 	stream.control.burstsPerStream = 0;    
-	stream.control.rateControl = RateControlPacketPerSec;    
-	stream.control.rateControlIntPart = 0;    
+	stream.control.rateControl = RateControlPercent;    
+	stream.control.rateControlIntPart = 10;    
 	stream.control.rateControlFracPart = 0;    
 	stream.control.startTxDelay = 0;    
 	stream.control.interBurstGapIntPart = 0;    

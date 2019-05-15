@@ -15,7 +15,7 @@ typedef struct {
 	unsigned long long pKernelVa;
 	unsigned long long PhysicalAddr;
 	unsigned long long CpuPhysical;
-	unsigned int Size;
+	unsigned long long Size;
 } ioc_io_buffer_t;
 
 typedef struct dmaparams
