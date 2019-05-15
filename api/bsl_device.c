@@ -147,8 +147,9 @@ bsl_device_setPortMode( int fd, int portid, EnumPortOpMode mode )
 	ret = dommap( fd, &map );
 	BSL_CHECK_RESULT( ret, ret );
 
-	bool link40G = (portid == 0) && is40G(map) ? true : false;
-	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PMSR, mode );
+//	bool link40G = (portid == 0) && is40G(map) ? true : false;
+//	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PMSR, mode );
+	WRITE64( map, OFFSET_REGISTER_PORT(portid)+PMSR, mode );
 
 	domunmap( fd, &map );
 	return ResultSuccess;
@@ -164,10 +165,11 @@ bsl_device_setPortActive( int fd, int portid, EnumPortActive enable )
 
 	ret = dommap( fd, &map );
 	BSL_CHECK_RESULT( ret, ret );
-	bool link40G = (portid == 0) && is40G(map) ? true : false;
+//	bool link40G = (portid == 0) && is40G(map) ? true : false;
 
 //	enable = enable ? 0 : 1;
-	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PECR, enable );
+//	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PECR, enable );
+	WRITE64( map, OFFSET_REGISTER_PORT(portid)+PECR, enable );
 
 	BSL_DEV(("%s: PECR %X link40G %d enable %d\n", __func__, PECR, link40G, enable));
 
@@ -199,8 +201,9 @@ bsl_device_setLatency( int fd, int portid, int latency, int sequence, int signat
 	if( signature ) pmsr |= ( 1 << 3 );	
 	else pmsr &= ~( 1 << 3 );
 
-	bool link40G = (portid == 0) && is40G(map) ? true : false;
-	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PMSR, pmsr );
+//	bool link40G = (portid == 0) && is40G(map) ? true : false;
+//	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PMSR, pmsr );
+	WRITE64( map, OFFSET_REGISTER_PORT(portid)+PMSR, pmsr );
 
 	domunmap( fd, &map );
 	return ResultSuccess;
@@ -590,7 +593,6 @@ bsl_device_enableStream(
 	return ResultSuccess;
 }
 
-#if 0  //get from GUI
 static unsigned long long getIFGFromRateSpec( T_Stream* stream, T_Frame* finfo, int* fsize )
 {
 	double fsize_avg = 0.;
@@ -609,7 +611,8 @@ static unsigned long long getIFGFromRateSpec( T_Stream* stream, T_Frame* finfo, 
 		fsize_avg /= NUM_FRAMESIZE_RANDOM;
 	}
 	else if( finfo->framesize.fsizeSpec == FrameSizeIncrement ) {
-		fsize_avg = ( finfo->framesize.fsizeMin + finfo->framesize.fsizeMax ) / 2;
+		//fsize_avg = ( finfo->framesize.fsizeMin + finfo->framesize.fsizeMax ) / 2;
+		fsize_avg = finfo->framesize.fsizeMin;
 	}
 	else {
 		BSL_ERROR(("%s: Undefined FrameSizeSpec %d\n", 
@@ -617,25 +620,17 @@ static unsigned long long getIFGFromRateSpec( T_Stream* stream, T_Frame* finfo, 
 		fsize_avg = ( SIZE_FRAME_MIN + SIZE_FRAME_MAX ) / 2;
 	}
 
-	if( stream->control.rateControl == RateControlPercent ) {
-		ifg = ( ( 100. * ( fsize_avg + 20. ) ) / rateval ) - 8. - fsize_avg;
-	}
-	else if( stream->control.rateControl == RateControlPacketPerSec ) {
-		ifg = ( 10000000000ULL / ( 8 * rateval ) ) - fsize_avg - 8;
-	}
-	else if( stream->control.rateControl == RateControlBitPerSec ) {
-		ifg = ( ( 10 * ( fsize_avg + 20 ) ) / rateval ) - 8 - fsize_avg;
-	}
-	else {
-		BSL_ERROR(("%s: Undefined Rate Control %d\n", 
-					__func__, stream->control.rateControl ));
-		ifg = 0;
-	}
+	fsize_avg += SIZE_PREAMBLE + SIZE_ETHER_FCS;
 
-	ifg += SIZE_PREAMBLE;
+	ifg = 
+		stream->control.rateControl == RateControlPercent ?
+		((fsize_avg + (double)(SIZE_IFG_SHORT))*100./rateval) - fsize_avg : 
+		stream->control.rateControl == RateControlPacketPerSec ?
+		(double)(10000000000ULL/(8. * rateval)) - fsize_avg :
+		0;
+
 	return ifg;
 }
-#endif
 
 #if 0 //NYI
 //TODO: Check the distribution
@@ -2128,9 +2123,9 @@ bsl_device_setStreamDetail(
 	BSL_DEV(("%s: STDR  %016llX\n", __func__, regval ));
 
     //BGCR
-#if 0  //get from GUI
-	regval = getIFGFromRateSpec( stream, &proto->fi, fsize );
-#else
+	unsigned int ifg_local = (unsigned int)getIFGFromRateSpec( stream, &proto->fi, fsize );
+	BSL_DEV(("%s: Compare IFG Local %08X APP %016X\n", __func__, ifg_local, stream->control.ifg));
+     
 	int pktsize = 
 		proto->fi.framesize.fsizeSpec == FrameSizeFixed ? 
 		proto->fi.framesize.sizeOrStep : 
@@ -2142,7 +2137,6 @@ bsl_device_setStreamDetail(
 	int alpha = (mod < 5) ? 8 : 0;
 
 	regval = stream->control.ifg + mod + alpha;
-#endif
 	WRITE64( map, BGCR, regval );
 	BSL_DEV(("%s: pktsize %d mod %d ifg %u\n", __func__, (pktsize+4), mod, stream->control.ifg ));
 	BSL_DEV(("%s: BGCR  %016llX\n", __func__, regval ));
