@@ -21,6 +21,8 @@ bsl-objs	:= bsl_main.o bsl_pci.o bsl_ctl.o \
 			   bsl_util.o \
 			   bsl_phy.o \
 
+obj-m += bsl_netdev.o
+
 #			   bsl_acl.o bsl_syncookie.o bsl_ratelimit.o bsl_stat.o bsl_stat_timer.o 
 
 ifeq ($(INSTALL_PATH),)

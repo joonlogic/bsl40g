@@ -700,3 +700,53 @@ void bsl_ctl_cleanup(struct cdev *bsl_cdevp, int count)
 	cdev_del(bsl_cdevp);
 	unregister_chrdev_region(bsl_devp->devno, count);
 }
+
+//For EXPORT
+int bsl_max_devcount(void)
+{
+	return g_dev_count;
+}
+
+EXPORT_SYMBOL(bsl_max_devcount);
+
+unsigned long long bsl_read_reg(int devid, int addr)
+{
+	bsl_pci_t* bsl_pcip = NULL;
+
+	if(devid >= g_dev_count) {
+		printk("NOT INSTALLED the device %d\n", devid);
+		return 0;
+	}
+
+	bsl_pcip = &bsl_devp->bsl_pci[devid];
+	if(!bsl_pcip) {
+		printk("NULL Exception bsl_pcip\n");
+		return 0;
+	}
+
+	return BSL_READ_REG(bsl_pcip, addr);
+}
+
+EXPORT_SYMBOL(bsl_read_reg);
+
+void bsl_write_reg(int devid, int addr, uint64_t val)
+{
+	bsl_pci_t* bsl_pcip = NULL;
+
+	if(devid >= g_dev_count) {
+		printk("NOT INSTALLED the device %d\n", devid);
+		return;
+	}
+
+	bsl_pcip = &bsl_devp->bsl_pci[devid];
+	if(!bsl_pcip) {
+		printk("NULL Exception bsl_pcip\n");
+		return;
+	}
+
+	spin_lock(&(bsl_pcip->lock_hwaccess));
+	BSL_WRITE_REG(bsl_pcip, addr, val);
+	spin_unlock(&(bsl_pcip->lock_hwaccess));
+}
+
+EXPORT_SYMBOL(bsl_write_reg);
