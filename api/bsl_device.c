@@ -171,7 +171,7 @@ bsl_device_setPortActive( int fd, int portid, EnumPortActive enable )
 //	WRITE64_EXT( map, OFFSET_REGISTER_PORT(portid)+PECR, enable );
 	WRITE64( map, OFFSET_REGISTER_PORT(portid)+PECR, enable );
 
-	BSL_DEV(("%s: PECR %X link40G %d enable %d\n", __func__, PECR, link40G, enable));
+//	BSL_DEV(("%s: PECR %X link40G %d enable %d\n", __func__, PECR, link40G, enable));
 
 	BSL_DEV(("%s: OFFSET_REGISTER_PORT(portid)+PECR (%X) = %016X\n", __func__, OFFSET_REGISTER_PORT(portid)+PECR, enable ));
 
@@ -2078,14 +2078,14 @@ bsl_device_setStreamDetail(
 		if( ( proto->l3.protocol == ProtocolIP4 ) ||
 			( proto->l3.protocol == ProtocolIP4OverIP6 ) ||
 			( proto->l3.protocol == ProtocolIP6OverIP4 ) ) {
-			regi |= _get_ip4_checksum( proto, &isoverride_ip4 );
+			regi |= htons(_get_ip4_checksum( proto, &isoverride_ip4 ));
 		}
 
 		if( ( proto->l4.protocol == ProtocolTCP ) ||
 			( proto->l4.protocol == ProtocolUDP ) ||
 			( proto->l4.protocol == ProtocolICMP ) ) {
 			regi |= 
-				(unsigned long long)(_get_l4_checksum( proto, &isoverride_l4 ) & 
+				(unsigned long long)(htons(_get_l4_checksum( proto, &isoverride_l4 )) & 
 				M_CSVR_L4_START_VALUE ) << I_CSVR_L4_START_VALUE;
 		}
 
@@ -2921,7 +2921,7 @@ static int start_dma( int fd, char* map, int cardid, int portid, unsigned long l
         goto close_fd;
     }
 
-    printf("UAddr(%p) PAddr(%llx) VAddr(%llx) Size(%ld)\n",
+    printf("UAddr(%p) PAddr(%llx) VAddr(%llx) Size(%lld)\n",
         pciUserp,
         pciBuffer->PhysicalAddr,
         pciBuffer->CpuPhysical,
